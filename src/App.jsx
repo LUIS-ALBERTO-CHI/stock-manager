@@ -11,19 +11,10 @@ const AREA_ORDER = [
   "MATERIAL"
 ];
 
-const initialData = {
-  PECUARIO: [],
-  MASCOTAS: [],
-  "EQUINO GOLD": [],
-  NUCAN: [],
-  KUBOTA: [],
-  NUPEC: [],
-  LABORATORIOS: [],
-  MATERIAL: []
-};
-
 export default function StockApp() {
-  const [areas, setAreas] = useState(initialData);
+  const API_URL = import.meta.env.VITE_API_URL || "/api";
+
+  const [areas, setAreas] = useState({});
   const [activeArea, setActiveArea] = useState("PECUARIO");
   const [movements, setMovements] = useState([]);
 
@@ -40,126 +31,105 @@ export default function StockApp() {
 
   const products = areas[activeArea] || [];
 
-  useEffect(() => {
-    setLoading(true);
-    const t = setTimeout(()=>setLoading(false),600);
-    return ()=>clearTimeout(t);
-  },[activeArea]);
-
   const notify = (message, type = "info") => {
     setNotification({ message, type });
     setTimeout(() => setNotification(null), 2600);
   };
 
-  const addProduct = () => {
+  // cargar productos
+  const loadProducts = async () => {
+    setLoading(true);
+
+    const res = await fetch(`${API_URL}/products?area=${activeArea}`);
+    const data = await res.json();
+
+    setAreas(prev => ({
+      ...prev,
+      [activeArea]: data
+    }));
+
+    setLoading(false);
+  };
+
+  // cargar movimientos
+  const loadMovements = async () => {
+    const res = await fetch(`${API_URL}/movements?area=${activeArea}`);
+    const data = await res.json();
+
+    setMovements(data);
+  };
+
+  useEffect(() => {
+    loadProducts();
+    loadMovements();
+  }, [activeArea]);
+
+
+  const addProduct = async () => {
     if (!newProduct.trim()) {
       notify("Ingresa nombre del producto", "error");
       return;
     }
 
-    const normalizedName = newProduct.trim().toLowerCase();
+    await fetch(`${API_URL}/products`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: newProduct,
+        stock: Number(initialStock || 0),
+        comment,
+        area: activeArea
+      })
+    });
 
-    const existingProduct = products.find(
-      (p) => p.name.toLowerCase() === normalizedName
-    );
-
-    let updatedProducts;
-
-    if (existingProduct) {
-      updatedProducts = products.map((p) =>
-        p.id === existingProduct.id
-          ? { ...p, stock: p.stock + Number(initialStock || 0) }
-          : p
-      );
-
-      notify("Stock actualizado", "success");
-    } else {
-      updatedProducts = [
-        ...products,
-        {
-          id: Date.now(),
-          name: newProduct.trim(),
-          stock: Number(initialStock || 0),
-          comment: comment || ""
-        }
-      ];
-
-      notify("Producto creado", "success");
-    }
-
-    setAreas({ ...areas, [activeArea]: updatedProducts });
+    notify("Producto guardado", "success");
 
     setNewProduct("");
     setInitialStock("");
     setComment("");
+
+    loadProducts();
   };
 
-  const addMovement = () => {
+
+  const addMovement = async () => {
     if (!productName || !qty) {
       notify("Selecciona producto y cantidad", "error");
       return;
     }
 
-    const product = products.find((p) => p.name === productName);
-
-    if (type === "salida" && product?.stock < Number(qty)) {
-      notify("Stock insuficiente", "error");
-      return;
-    }
-
-    const updatedProducts = products.map((p) => {
-      if (p.name === productName) {
-        const newStock =
-          type === "entrada"
-            ? p.stock + Number(qty)
-            : p.stock - Number(qty);
-
-        return { ...p, stock: newStock };
-      }
-      return p;
-    });
-
-    setAreas({ ...areas, [activeArea]: updatedProducts });
-
-    setMovements([
-      ...movements,
-      {
-        id: Date.now(),
-        date: new Date().toLocaleDateString(),
+    await fetch(`${API_URL}/movements`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
         product: productName,
         qty: Number(qty),
         type,
         area: activeArea
-      }
-    ]);
+      })
+    });
 
     notify("Movimiento guardado", "info");
 
     setQty("");
+
+    loadProducts();
+    loadMovements();
   };
+
 
   return (
     <div className="min-h-screen bg-slate-100">
 
       {notification && (
         <div className="fixed right-6 top-20 z-50">
-          <div className="backdrop-blur-md bg-white/70 border border-white/40 shadow-xl px-6 py-4 rounded-2xl flex items-center gap-3 min-w-[280px] text-slate-800">
-
-            <div className={`text-xl
-              ${notification.type === "success" ? "text-green-600" : ""}
-              ${notification.type === "error" ? "text-red-600" : ""}
-              ${notification.type === "info" ? "text-blue-600" : ""}`}>
-
+          <div className="backdrop-blur-md bg-white/70 border border-white/40 shadow-xl px-6 py-4 rounded-2xl flex items-center gap-3 min-w-[280px]">
+            <div>
               {notification.type === "success" && "✔"}
               {notification.type === "error" && "⚠"}
               {notification.type === "info" && "ℹ"}
-
             </div>
-
-            <div className="font-medium">
-              {notification.message}
-            </div>
-
+            <div>{notification.message}</div>
           </div>
         </div>
       )}
@@ -175,7 +145,6 @@ export default function StockApp() {
 
       <main className="p-6 max-w-7xl mx-auto space-y-6">
 
-        {/* AREAS SCROLL */}
         <div className="overflow-x-auto pb-2">
           <div className="flex gap-2 min-w-max">
 
@@ -183,7 +152,7 @@ export default function StockApp() {
               <button
                 key={area}
                 onClick={() => setActiveArea(area)}
-                className={`px-4 py-2 rounded-lg text-sm font-semibold whitespace-nowrap transition
+                className={`px-4 py-2 rounded-lg text-sm font-semibold whitespace-nowrap
                 ${activeArea === area
                   ? "bg-[#4CAF50] text-white"
                   : "bg-white border"}`}
@@ -196,15 +165,15 @@ export default function StockApp() {
         </div>
 
 
-        {/* FORMS */}
         <div className="grid md:grid-cols-2 gap-6">
 
           <div className="bg-white p-5 rounded-xl shadow space-y-3">
+
             <h2 className="font-semibold">Nuevo producto</h2>
 
             <input
               className="border p-2 rounded-lg w-full"
-              placeholder="Ej: Playera negra"
+              placeholder="Nombre"
               value={newProduct}
               onChange={(e) => setNewProduct(e.target.value)}
             />
@@ -212,24 +181,23 @@ export default function StockApp() {
             <input
               type="number"
               className="border p-2 rounded-lg w-full"
-              placeholder="Stock inicial"
+              placeholder="Stock"
               value={initialStock}
               onChange={(e) => setInitialStock(e.target.value)}
             />
 
             <textarea
-              className="border p-2 rounded-lg w-full resize-none"
-              placeholder="Comentario (opcional)"
+              className="border p-2 rounded-lg w-full"
+              placeholder="Nota opcional"
               value={comment}
               onChange={(e) => setComment(e.target.value)}
-              rows={2}
             />
 
             <button
               onClick={addProduct}
               className="bg-[#4CAF50] text-white py-2 rounded-lg w-full"
             >
-              Guardar producto
+              Guardar
             </button>
 
           </div>
@@ -244,7 +212,7 @@ export default function StockApp() {
               value={productName}
               onChange={(e) => setProductName(e.target.value)}
             >
-              <option value="">Seleccionar producto</option>
+              <option value="">Producto</option>
 
               {products.map((p) => (
                 <option key={p.id}>{p.name}</option>
@@ -281,7 +249,6 @@ export default function StockApp() {
         </div>
 
 
-        {/* INVENTORY */}
         <div className="bg-white rounded-xl shadow overflow-hidden">
 
           <div className="bg-[#0b4f71] text-white px-4 py-2">
@@ -302,33 +269,19 @@ export default function StockApp() {
 
               {loading && [...Array(4)].map((_,i)=>(
                 <tr key={i} className="border-t animate-pulse">
-                  <td className="p-3">
-                    <div className="h-4 bg-gray-200 rounded w-40"></div>
-                  </td>
-                  <td className="p-3">
-                    <div className="h-4 bg-gray-200 rounded w-32"></div>
-                  </td>
-                  <td className="p-3">
-                    <div className="h-4 bg-gray-200 rounded w-16"></div>
-                  </td>
+                  <td className="p-3"><div className="h-4 bg-gray-200 rounded w-40"></div></td>
+                  <td className="p-3"><div className="h-4 bg-gray-200 rounded w-32"></div></td>
+                  <td className="p-3"><div className="h-4 bg-gray-200 rounded w-16"></div></td>
                 </tr>
               ))}
 
               {!loading && products.map((p) => (
                 <tr key={p.id} className="border-t">
-                  <td className="p-3 font-medium">{p.name}</td>
-                  <td className="p-3 text-gray-500 text-sm">{p.comment || "—"}</td>
+                  <td className="p-3">{p.name}</td>
+                  <td className="p-3 text-gray-500">{p.comment || "-"}</td>
                   <td className="p-3 font-semibold">{p.stock}</td>
                 </tr>
               ))}
-
-              {!loading && products.length === 0 && (
-                <tr>
-                  <td colSpan="3" className="p-6 text-center text-gray-400">
-                    Sin productos
-                  </td>
-                </tr>
-              )}
 
             </tbody>
 
@@ -337,7 +290,6 @@ export default function StockApp() {
         </div>
 
 
-        {/* HISTORY */}
         <div className="bg-white rounded-xl shadow overflow-hidden">
 
           <div className="bg-slate-800 text-white px-4 py-2">
@@ -348,56 +300,23 @@ export default function StockApp() {
 
             <thead className="bg-gray-100">
               <tr>
-                <th className="p-3 text-left">Fecha</th>
-                <th className="p-3 text-left">Producto</th>
-                <th className="p-3 text-left">Tipo</th>
-                <th className="p-3 text-left">Cantidad</th>
+                <th className="p-3">Fecha</th>
+                <th className="p-3">Producto</th>
+                <th className="p-3">Tipo</th>
+                <th className="p-3">Cantidad</th>
               </tr>
             </thead>
 
             <tbody>
 
-              {movements
-                .filter((m) => m.area === activeArea)
-                .map((m) => (
-
-                  <tr key={m.id} className="border-t">
-
-                    <td className="p-3">{m.date}</td>
-
-                    <td className="p-3">{m.product}</td>
-
-                    <td className="p-3">
-
-                      <span className={`px-2 py-1 rounded text-xs
-                        ${m.type === "entrada"
-                          ? "bg-green-100 text-green-700"
-                          : "bg-red-100 text-red-700"}`}>
-
-                        {m.type}
-
-                      </span>
-
-                    </td>
-
-                    <td className="p-3">{m.qty}</td>
-
-                  </tr>
-
-                ))}
-
-
-              {movements.filter(m => m.area === activeArea).length === 0 && (
-
-                <tr>
-
-                  <td colSpan="4" className="p-6 text-center text-gray-400">
-                    Sin movimientos
-                  </td>
-
+              {movements.map(m => (
+                <tr key={m.id} className="border-t">
+                  <td className="p-3">{m.date}</td>
+                  <td className="p-3">{m.product}</td>
+                  <td className="p-3">{m.type}</td>
+                  <td className="p-3">{m.qty}</td>
                 </tr>
-
-              )}
+              ))}
 
             </tbody>
 
