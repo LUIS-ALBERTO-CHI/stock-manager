@@ -11,6 +11,17 @@ const AREA_ORDER = [
   "MATERIAL"
 ];
 
+const AREA_COLORS = {
+  "PECUARIO": "bg-green-800",
+  "MASCOTAS": "bg-blue-900",
+  "EQUINO GOLD": "bg-amber-900", // El ámbar 900 de Tailwind es color café
+  "NUCAN": "bg-purple-700",
+  "KUBOTA": "bg-orange-600",
+  "NUPEC": "bg-sky-500", // Azul claro
+  "LABORATORIOS": "bg-yellow-500",
+  "MATERIAL": "bg-pink-500"
+};
+
 export default function StockApp() {
   const API_URL = import.meta.env.VITE_API_URL || "/api";
 
@@ -346,9 +357,9 @@ className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg shado
               <button
                 key={area}
                 onClick={() => setActiveArea(area)}
-                className={`px-4 py-2 rounded-lg text-sm font-semibold whitespace-nowrap ${
+                className={`px-4 py-2 rounded-lg text-sm font-semibold whitespace-nowrap transition-colors ${
                   activeArea === area
-                    ? "bg-[#4CAF50] text-white"
+                    ? `${AREA_COLORS[area]} text-white`
                     : "bg-white border"
                 }`}
               >
@@ -435,7 +446,7 @@ className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg shado
 
         <div className="bg-white rounded-xl shadow overflow-hidden">
 
-          <div className="bg-[#0b4f71] text-white px-4 py-3 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+          <div className={`${AREA_COLORS[activeArea]} transition-colors text-white px-4 py-3 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3`}>
             <span className="font-semibold">Inventario - {activeArea}</span>
             <input
               type="text"
@@ -576,7 +587,7 @@ className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg shado
 
         <div className="bg-white rounded-xl shadow overflow-hidden">
 
-          <div className="bg-slate-800 text-white px-4 py-3 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+          <div className={`${AREA_COLORS[activeArea]} transition-colors text-white px-4 py-3 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3`}>
             <span className="font-semibold">Historial - {activeArea}</span>
 
             <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
