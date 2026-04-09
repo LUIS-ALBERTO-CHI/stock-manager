@@ -44,4 +44,16 @@ export default async function handler(req, res) {
   return res.status(200).json({ ok:true });
 }
 
+  if (req.method === 'DELETE') {
+
+    const { id } = req.body;
+
+    await sql`
+      DELETE FROM products
+      WHERE id = ${id}
+    `;
+
+    return res.status(200).json({ ok:true });
+  }
+
 }
