@@ -96,10 +96,10 @@ const paginatedMovements = filteredMovements.slice(
     setMovements(data);
   };
 
-   const exportExcel = async () => {
-  const XLSX = await import("xlsx");
+  const exportExcel = async () => {
+  const ExcelJS = (await import("exceljs")).default;
 
-  const workbook = XLSX.utils.book_new();
+  const workbook = new ExcelJS.Workbook();
 
   for (const area of AREA_ORDER) {
 
@@ -109,54 +109,122 @@ const paginatedMovements = filteredMovements.slice(
     const resMovements = await fetch(`${API_URL}/movements?area=${area}`);
     const movements = await resMovements.json();
 
-    const rows = [];
+    const sheet = workbook.addWorksheet(area);
 
-    // espacio inicial
-    rows.push([]);
-    rows.push([]);
+    // =========================
+    // INVENTARIO (TABLA VERDE)
+    // =========================
 
-    // titulo vertical area
-    const startRow = 3;
+    sheet.mergeCells("A3:A" + (3 + products.length));
+    const areaCell = sheet.getCell("A3");
+    areaCell.value = area;
+    areaCell.alignment = { vertical: "middle", horizontal: "center" };
+    areaCell.fill = {
+      type: "pattern",
+      pattern: "solid",
+      fgColor: { argb: "A9D08E" } // verde
+    };
+    areaCell.font = { bold: true };
 
-    rows.push([area, "MATERIAL", "STOCK ACTUAL"]);
+    // headers
+    sheet.getCell("B3").value = "MATERIAL";
+    sheet.getCell("C3").value = "STOCK";
 
-    products.forEach(p=>{
-      rows.push(["", p.name, p.stock]);
+    ["B3", "C3"].forEach(cell => {
+      sheet.getCell(cell).fill = {
+        type: "pattern",
+        pattern: "solid",
+        fgColor: { argb: "A9D08E" }
+      };
+      sheet.getCell(cell).font = { bold: true };
+      sheet.getCell(cell).border = borderStyle;
     });
 
-    rows.push([]);
+    // productos
+    products.forEach((p, i) => {
+      const row = sheet.getRow(4 + i);
 
-    rows.push(["SALIDAS", "FECHA", "CODIGO", "CANTIDAD"]);
+      row.getCell(2).value = p.name;
+      row.getCell(3).value = p.stock;
 
-    movements.forEach(m=>{
-      rows.push([
-        "",
-        new Date(m.date).toLocaleDateString("es-MX"),
-        m.product,
-        m.qty
-      ]);
+      row.eachCell(cell => {
+        cell.border = borderStyle;
+      });
     });
 
-    const ws = XLSX.utils.aoa_to_sheet(rows);
+    // =========================
+    // SALIDAS (TABLA MORADA)
+    // =========================
 
-    // merges para titulo vertical
-    ws['!merges'] = [
-      { s:{r:2,c:0}, e:{r:2+products.length,c:0}},
-      { s:{r:3+products.length,c:0}, e:{r:3+products.length+movements.length,c:0}}
-    ];
+    const startMov = 5 + products.length;
+
+    sheet.mergeCells(`A${startMov}:A${startMov + movements.length}`);
+    const movTitle = sheet.getCell(`A${startMov}`);
+    movTitle.value = "SALIDAS";
+    movTitle.alignment = { vertical: "middle", horizontal: "center" };
+    movTitle.fill = {
+      type: "pattern",
+      pattern: "solid",
+      fgColor: { argb: "D9B3FF" } // morado
+    };
+    movTitle.font = { bold: true };
+
+    // headers
+    sheet.getCell(`B${startMov}`).value = "FECHA";
+    sheet.getCell(`C${startMov}`).value = "CODIGO";
+    sheet.getCell(`D${startMov}`).value = "CANTIDAD";
+
+    [`B${startMov}`, `C${startMov}`, `D${startMov}`].forEach(cell => {
+      sheet.getCell(cell).fill = {
+        type: "pattern",
+        pattern: "solid",
+        fgColor: { argb: "D9B3FF" }
+      };
+      sheet.getCell(cell).font = { bold: true };
+      sheet.getCell(cell).border = borderStyle;
+    });
+
+    // movimientos
+    movements.forEach((m, i) => {
+      const row = sheet.getRow(startMov + 1 + i);
+
+      row.getCell(2).value = new Date(m.date).toLocaleDateString("es-MX");
+      row.getCell(3).value = m.product;
+      row.getCell(4).value = m.qty;
+
+      row.eachCell(cell => {
+        cell.border = borderStyle;
+      });
+    });
 
     // ancho columnas
-    ws['!cols'] = [
-      { wch:12 },
-      { wch:40 },
-      { wch:15 },
-      { wch:15 }
+    sheet.columns = [
+      { width: 15 },
+      { width: 40 },
+      { width: 15 },
+      { width: 15 }
     ];
-
-    XLSX.utils.book_append_sheet(workbook, ws, area);
   }
 
-  XLSX.writeFile(workbook, "fogysa-stock.xlsx");
+  // descargar
+  const buffer = await workbook.xlsx.writeBuffer();
+
+  const blob = new Blob([buffer], {
+    type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+  });
+
+  const url = window.URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "fogysa-stock.xlsx";
+  a.click();
+};
+
+const borderStyle = {
+  top: { style: "thin" },
+  left: { style: "thin" },
+  bottom: { style: "thin" },
+  right: { style: "thin" }
 };
 
   useEffect(() => {
