@@ -35,22 +35,41 @@ export default function StockApp() {
   const [pageProducts, setPageProducts] = useState(1);
   const [pageMovements, setPageMovements] = useState(1);
 
+  const [filterProduct, setFilterProduct] = useState("");
+  const [filterDate, setFilterDate] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
+
+  const [editStockId, setEditStockId] = useState(null);
+  const [editStockValue, setEditStockValue] = useState("");
+
+  const [confirmModal, setConfirmModal] = useState(null);
+
   const ITEMS_PER_PAGE = 6;
 
   const products = areas[activeArea] || [];
 
-  const paginatedProducts = products.slice(
+  const searchedProducts = products.filter(p =>
+    p.name.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  const paginatedProducts = searchedProducts.slice(
     (pageProducts - 1) * ITEMS_PER_PAGE,
     pageProducts * ITEMS_PER_PAGE
   );
 
-  const paginatedMovements = movements.slice(
-    (pageMovements - 1) * ITEMS_PER_PAGE,
-    pageMovements * ITEMS_PER_PAGE
-  );
+  const filteredMovements = movements.filter(m=>{
+  const matchProduct = filterProduct ? m.product===filterProduct : true;
+  const matchDate = filterDate ? m.date?.startsWith(filterDate) : true;
+  return matchProduct && matchDate;
+});
 
-  const totalProductPages = Math.ceil(products.length / ITEMS_PER_PAGE);
-  const totalMovementPages = Math.ceil(movements.length / ITEMS_PER_PAGE);
+const paginatedMovements = filteredMovements.slice(
+  (pageMovements - 1) * ITEMS_PER_PAGE,
+  pageMovements * ITEMS_PER_PAGE
+);
+
+  const totalProductPages = Math.ceil(searchedProducts.length / ITEMS_PER_PAGE);
+  const totalMovementPages = Math.ceil(filteredMovements.length / ITEMS_PER_PAGE);
 
   const notify = (message, type = "info") => {
     setNotification({ message, type });
@@ -110,18 +129,39 @@ export default function StockApp() {
   };
 
   const updateProductName = async (id) => {
-    if(!editName.trim()) return;
+  await fetch(`${API_URL}/products`,{
+    method:"PUT",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({id,name:editName})
+  });
 
-    await fetch(`${API_URL}/products`, {
-      method:"PUT",
-      headers:{"Content-Type":"application/json"},
-      body: JSON.stringify({ id, name: editName })
-    });
+  setEditingId(null);
+  notify("Nombre actualizado","success");
+  loadProducts();
+};
 
-    setEditingId(null);
-    notify("Nombre actualizado","success");
-    loadProducts();
-  };
+const updateStock = async(id)=>{
+  await fetch(`${API_URL}/products`,{
+    method:"PUT",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({id,stock:Number(editStockValue)})
+  });
+
+  setEditStockId(null);
+  notify("Stock actualizado","success");
+  loadProducts();
+};
+
+const deleteProduct = async(id)=>{
+  await fetch(`${API_URL}/products`,{
+    method:"DELETE",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({id})
+  });
+
+  notify("Producto eliminado","success");
+  loadProducts();
+};
 
   const addMovement = async () => {
     if (!productName || !qty) {
@@ -268,8 +308,15 @@ export default function StockApp() {
 
         <div className="bg-white rounded-xl shadow overflow-hidden">
 
-          <div className="bg-[#0b4f71] text-white px-4 py-2">
-            Inventario - {activeArea}
+          <div className="bg-[#0b4f71] text-white px-4 py-3 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+            <span className="font-semibold">Inventario - {activeArea}</span>
+            <input
+              type="text"
+              placeholder="🔍 Buscar producto..."
+              className="text-black text-sm px-4 py-1.5 rounded-full w-full sm:w-72 focus:outline-none focus:ring-2 focus:ring-blue-400"
+              value={searchQuery}
+              onChange={(e) => {setSearchQuery(e.target.value); setPageProducts(1);}}
+            />
           </div>
 
           <table className="w-full text-sm">
@@ -278,6 +325,7 @@ export default function StockApp() {
                 <th className="p-3 text-left">Producto</th>
                 <th className="p-3 text-left">Nota</th>
                 <th className="p-3 text-left">Stock</th>
+<th className="p-3">Acciones</th>
               </tr>
             </thead>
 
@@ -291,33 +339,43 @@ export default function StockApp() {
                 </tr>
               ))}
 
-              {!loading && paginatedProducts.map((p) => (
-                <tr key={p.id} className="border-t">
-                  <td className="p-3">
-                    {editingId===p.id ? (
-                      <input
-                        className="border rounded px-2 py-1 text-sm"
-                        value={editName}
-                        onChange={(e)=>setEditName(e.target.value)}
-                        onBlur={()=>updateProductName(p.id)}
-                        autoFocus
-                      />
-                    ):(
-                      <div
-                        className="cursor-pointer hover:text-indigo-600"
-                        onClick={()=>{
-                          setEditingId(p.id);
-                          setEditName(p.name);
-                        }}
-                      >
-                        {p.name}
-                      </div>
-                    )}
-                  </td>
-                  <td className="p-3 text-gray-500">{p.comment || "-"}</td>
-                  <td className="p-3 font-semibold">{p.stock}</td>
-                </tr>
-              ))}
+              {!loading && paginatedProducts.map((p)=>(
+<tr key={p.id} className="border-t">
+<td className="p-3 flex items-center gap-2">
+{editingId===p.id ? (
+<>
+<input className="border rounded px-2 py-1" value={editName} onChange={e=>setEditName(e.target.value)}/>
+<button onClick={()=>updateProductName(p.id)}>✔</button>
+</>
+):(
+<>
+<span>{p.name}</span>
+<button onClick={()=>{setEditingId(p.id);setEditName(p.name)}}>✏</button>
+</>
+)}
+</td>
+
+<td className="p-3 text-gray-500">{p.comment||"-"}</td>
+
+<td className="p-3">
+{editStockId===p.id?(
+<>
+<input type="number" className="border w-20" value={editStockValue} onChange={e=>setEditStockValue(e.target.value)}/>
+<button onClick={()=>updateStock(p.id)}>✔</button>
+</>
+):(
+<div className="flex items-center gap-2">
+<span>{p.stock}</span>
+<button onClick={()=>{setEditStockId(p.id);setEditStockValue(p.stock)}}>✏</button>
+</div>
+)}
+</td>
+
+<td className="p-3">
+<button onClick={()=>setConfirmModal(p.id)} className="text-red-500">🗑</button>
+</td>
+</tr>
+))}
 
             </tbody>
           </table>
@@ -325,7 +383,7 @@ export default function StockApp() {
           <div className="flex flex-col items-center gap-2 py-4 border-t bg-slate-50">
 
             <div className="text-xs text-slate-500">
-              Total productos: {products.length}
+              Total productos: {searchedProducts.length}
             </div>
 
             <div className="flex items-center gap-2 bg-white border rounded-full px-4 py-2 shadow-sm">
@@ -383,8 +441,26 @@ export default function StockApp() {
 
         <div className="bg-white rounded-xl shadow overflow-hidden">
 
-          <div className="bg-slate-800 text-white px-4 py-2">
-            Historial - {activeArea}
+          <div className="bg-slate-800 text-white px-4 py-3 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+            <span className="font-semibold">Historial - {activeArea}</span>
+
+            <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+              <select 
+                className="text-black text-sm px-3 py-1.5 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-400 w-full sm:w-48" 
+                value={filterProduct} 
+                onChange={e => {setFilterProduct(e.target.value); setPageMovements(1);}}
+              >
+                <option value="">Todos los productos</option>
+                {products.map(p=><option key={p.id}>{p.name}</option>)}
+              </select>
+
+              <input 
+                type="date" 
+                className="text-black text-sm px-3 py-1.5 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-400 w-full sm:w-auto" 
+                value={filterDate} 
+                onChange={e => {setFilterDate(e.target.value); setPageMovements(1);}}
+              />
+            </div>
           </div>
 
           <table className="w-full text-sm">
@@ -405,7 +481,11 @@ export default function StockApp() {
                     {new Date(m.date).toLocaleDateString("es-MX")}
                   </td>
                   <td className="p-3">{m.product}</td>
-                  <td className="p-3">{m.type}</td>
+                  <td className="p-3">
+<span className={`px-2 py-1 rounded-full text-xs ${m.type==='entrada'?'bg-green-100 text-green-700':'bg-red-100 text-red-700'}`}>
+{m.type}
+</span>
+</td>
                   <td className="p-3">{m.qty}</td>
                 </tr>
               ))}
@@ -468,7 +548,23 @@ export default function StockApp() {
 
         </div>
 
-      </main>
+      {confirmModal && (
+<div className="fixed inset-0 bg-black/40 flex items-center justify-center">
+<div className="bg-white p-6 rounded-xl shadow space-y-3">
+<div>Eliminar producto?</div>
+<div className="flex gap-2">
+<button className="bg-red-500 text-white px-3 py-1 rounded" onClick={()=>{deleteProduct(confirmModal);setConfirmModal(null)}}>
+Eliminar
+</button>
+<button className="border px-3 py-1 rounded" onClick={()=>setConfirmModal(null)}>
+Cancelar
+</button>
+</div>
+</div>
+</div>
+)}
+
+</main>
 
     </div>
   );
