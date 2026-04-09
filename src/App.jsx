@@ -96,35 +96,50 @@ const paginatedMovements = filteredMovements.slice(
     setMovements(data);
   };
 
-   const exportExcel = async () => {
+  const exportExcel = async () => {
   const XLSX = await import("xlsx");
 
   const workbook = XLSX.utils.book_new();
 
   for (const area of AREA_ORDER) {
+
     const resProducts = await fetch(`${API_URL}/products?area=${area}`);
     const products = await resProducts.json();
 
     const resMovements = await fetch(`${API_URL}/movements?area=${area}`);
     const movements = await resMovements.json();
 
-    const productRows = products.map(p => ({
-      MATERIAL: p.name,
-      STOCK: p.stock
-    }));
+    const sheetData = [];
 
-    const movementRows = movements.map(m => ({
-      FECHA: new Date(m.date).toLocaleDateString("es-MX"),
-      CODIGO: m.product,
-      TIPO: m.type,
-      CANTIDAD: m.qty
-    }));
+    // titulo area
+    sheetData.push([area]);
+    sheetData.push([]);
 
-    const ws1 = XLSX.utils.json_to_sheet(productRows);
-    const ws2 = XLSX.utils.json_to_sheet(movementRows);
+    // encabezado inventario
+    sheetData.push(["MATERIAL","STOCK"]);
 
-    XLSX.utils.book_append_sheet(workbook, ws1, `${area} STOCK`);
-    XLSX.utils.book_append_sheet(workbook, ws2, `${area} MOVS`);
+    products.forEach(p=>{
+      sheetData.push([p.name,p.stock]);
+    });
+
+    sheetData.push([]);
+    sheetData.push([]);
+
+    // encabezado movimientos
+    sheetData.push(["FECHA","CODIGO","TIPO","CANTIDAD"]);
+
+    movements.forEach(m=>{
+      sheetData.push([
+        new Date(m.date).toLocaleDateString("es-MX"),
+        m.product,
+        m.type,
+        m.qty
+      ]);
+    });
+
+    const worksheet = XLSX.utils.aoa_to_sheet(sheetData);
+
+    XLSX.utils.book_append_sheet(workbook, worksheet, area);
   }
 
   XLSX.writeFile(workbook, "fogysa-stock.xlsx");
