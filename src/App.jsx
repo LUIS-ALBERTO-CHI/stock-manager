@@ -29,14 +29,31 @@ export default function StockApp() {
   const [notification, setNotification] = useState(null);
   const [loading, setLoading] = useState(true);
 
+  const [pageProducts, setPageProducts] = useState(1);
+  const [pageMovements, setPageMovements] = useState(1);
+
+  const ITEMS_PER_PAGE = 6;
+
   const products = areas[activeArea] || [];
+
+  const paginatedProducts = products.slice(
+    (pageProducts - 1) * ITEMS_PER_PAGE,
+    pageProducts * ITEMS_PER_PAGE
+  );
+
+  const paginatedMovements = movements.slice(
+    (pageMovements - 1) * ITEMS_PER_PAGE,
+    pageMovements * ITEMS_PER_PAGE
+  );
+
+  const totalProductPages = Math.ceil(products.length / ITEMS_PER_PAGE);
+  const totalMovementPages = Math.ceil(movements.length / ITEMS_PER_PAGE);
 
   const notify = (message, type = "info") => {
     setNotification({ message, type });
     setTimeout(() => setNotification(null), 2600);
   };
 
-  // cargar productos
   const loadProducts = async () => {
     setLoading(true);
 
@@ -51,7 +68,6 @@ export default function StockApp() {
     setLoading(false);
   };
 
-  // cargar movimientos
   const loadMovements = async () => {
     const res = await fetch(`${API_URL}/movements?area=${activeArea}`);
     const data = await res.json();
@@ -63,7 +79,6 @@ export default function StockApp() {
     loadProducts();
     loadMovements();
   }, [activeArea]);
-
 
   const addProduct = async () => {
     if (!newProduct.trim()) {
@@ -91,7 +106,6 @@ export default function StockApp() {
     loadProducts();
   };
 
-
   const addMovement = async () => {
     if (!productName || !qty) {
       notify("Selecciona producto y cantidad", "error");
@@ -117,7 +131,6 @@ export default function StockApp() {
     loadMovements();
   };
 
-
   return (
     <div className="min-h-screen bg-slate-100">
 
@@ -134,7 +147,6 @@ export default function StockApp() {
         </div>
       )}
 
-
       <header className="bg-[#0b4f71] text-white px-6 py-4 shadow-lg">
         <div className="max-w-7xl mx-auto text-center">
           <h1 className="text-2xl font-bold">FOGYSA STOCK</h1>
@@ -142,33 +154,29 @@ export default function StockApp() {
         </div>
       </header>
 
-
       <main className="p-6 max-w-7xl mx-auto space-y-6">
 
         <div className="overflow-x-auto pb-2">
           <div className="flex gap-2 min-w-max">
-
             {AREA_ORDER.map((area) => (
               <button
                 key={area}
                 onClick={() => setActiveArea(area)}
-                className={`px-4 py-2 rounded-lg text-sm font-semibold whitespace-nowrap
-                ${activeArea === area
-                  ? "bg-[#4CAF50] text-white"
-                  : "bg-white border"}`}
+                className={`px-4 py-2 rounded-lg text-sm font-semibold whitespace-nowrap ${
+                  activeArea === area
+                    ? "bg-[#4CAF50] text-white"
+                    : "bg-white border"
+                }`}
               >
                 {area}
               </button>
             ))}
-
           </div>
         </div>
-
 
         <div className="grid md:grid-cols-2 gap-6">
 
           <div className="bg-white p-5 rounded-xl shadow space-y-3">
-
             <h2 className="font-semibold">Nuevo producto</h2>
 
             <input
@@ -199,12 +207,9 @@ export default function StockApp() {
             >
               Guardar
             </button>
-
           </div>
 
-
           <div className="bg-white p-5 rounded-xl shadow space-y-3">
-
             <h2 className="font-semibold">Movimiento</h2>
 
             <select
@@ -213,11 +218,9 @@ export default function StockApp() {
               onChange={(e) => setProductName(e.target.value)}
             >
               <option value="">Producto</option>
-
               {products.map((p) => (
                 <option key={p.id}>{p.name}</option>
               ))}
-
             </select>
 
             <input
@@ -243,11 +246,8 @@ export default function StockApp() {
             >
               Guardar movimiento
             </button>
-
           </div>
-
         </div>
-
 
         <div className="bg-white rounded-xl shadow overflow-hidden">
 
@@ -256,7 +256,6 @@ export default function StockApp() {
           </div>
 
           <table className="w-full text-sm">
-
             <thead className="bg-gray-100">
               <tr>
                 <th className="p-3 text-left">Producto</th>
@@ -267,7 +266,7 @@ export default function StockApp() {
 
             <tbody>
 
-              {loading && [...Array(4)].map((_,i)=>(
+              {loading && [...Array(4)].map((_, i) => (
                 <tr key={i} className="border-t animate-pulse">
                   <td className="p-3"><div className="h-4 bg-gray-200 rounded w-40"></div></td>
                   <td className="p-3"><div className="h-4 bg-gray-200 rounded w-32"></div></td>
@@ -275,7 +274,7 @@ export default function StockApp() {
                 </tr>
               ))}
 
-              {!loading && products.map((p) => (
+              {!loading && paginatedProducts.map((p) => (
                 <tr key={p.id} className="border-t">
                   <td className="p-3">{p.name}</td>
                   <td className="p-3 text-gray-500">{p.comment || "-"}</td>
@@ -284,11 +283,27 @@ export default function StockApp() {
               ))}
 
             </tbody>
-
           </table>
 
-        </div>
+          <div className="flex justify-end gap-2 p-3">
+            <button
+              disabled={pageProducts === 1}
+              onClick={() => setPageProducts(p => p - 1)}
+              className="px-3 py-1 border rounded"
+            >←</button>
 
+            <span className="text-sm">
+              {pageProducts} / {totalProductPages || 1}
+            </span>
+
+            <button
+              disabled={pageProducts === totalProductPages}
+              onClick={() => setPageProducts(p => p + 1)}
+              className="px-3 py-1 border rounded"
+            >→</button>
+          </div>
+
+        </div>
 
         <div className="bg-white rounded-xl shadow overflow-hidden">
 
@@ -297,7 +312,6 @@ export default function StockApp() {
           </div>
 
           <table className="w-full text-sm">
-
             <thead className="bg-gray-100">
               <tr>
                 <th className="p-3">Fecha</th>
@@ -309,9 +323,11 @@ export default function StockApp() {
 
             <tbody>
 
-              {movements.map(m => (
+              {paginatedMovements.map(m => (
                 <tr key={m.id} className="border-t">
-                  <td className="p-3">{m.date}</td>
+                  <td className="p-3">
+                    {new Date(m.date).toLocaleDateString("es-MX")}
+                  </td>
                   <td className="p-3">{m.product}</td>
                   <td className="p-3">{m.type}</td>
                   <td className="p-3">{m.qty}</td>
@@ -319,8 +335,25 @@ export default function StockApp() {
               ))}
 
             </tbody>
-
           </table>
+
+          <div className="flex justify-end gap-2 p-3">
+            <button
+              disabled={pageMovements === 1}
+              onClick={() => setPageMovements(p => p - 1)}
+              className="px-3 py-1 border rounded"
+            >←</button>
+
+            <span className="text-sm">
+              {pageMovements} / {totalMovementPages || 1}
+            </span>
+
+            <button
+              disabled={pageMovements === totalMovementPages}
+              onClick={() => setPageMovements(p => p + 1)}
+              className="px-3 py-1 border rounded"
+            >→</button>
+          </div>
 
         </div>
 
