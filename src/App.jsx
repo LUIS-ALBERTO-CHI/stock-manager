@@ -29,6 +29,9 @@ export default function StockApp() {
   const [notification, setNotification] = useState(null);
   const [loading, setLoading] = useState(true);
 
+  const [editingId, setEditingId] = useState(null);
+  const [editName, setEditName] = useState("");
+
   const [pageProducts, setPageProducts] = useState(1);
   const [pageMovements, setPageMovements] = useState(1);
 
@@ -103,6 +106,20 @@ export default function StockApp() {
     setInitialStock("");
     setComment("");
 
+    loadProducts();
+  };
+
+  const updateProductName = async (id) => {
+    if(!editName.trim()) return;
+
+    await fetch(`${API_URL}/products`, {
+      method:"PUT",
+      headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({ id, name: editName })
+    });
+
+    setEditingId(null);
+    notify("Nombre actualizado","success");
     loadProducts();
   };
 
@@ -276,7 +293,27 @@ export default function StockApp() {
 
               {!loading && paginatedProducts.map((p) => (
                 <tr key={p.id} className="border-t">
-                  <td className="p-3">{p.name}</td>
+                  <td className="p-3">
+                    {editingId===p.id ? (
+                      <input
+                        className="border rounded px-2 py-1 text-sm"
+                        value={editName}
+                        onChange={(e)=>setEditName(e.target.value)}
+                        onBlur={()=>updateProductName(p.id)}
+                        autoFocus
+                      />
+                    ):(
+                      <div
+                        className="cursor-pointer hover:text-indigo-600"
+                        onClick={()=>{
+                          setEditingId(p.id);
+                          setEditName(p.name);
+                        }}
+                      >
+                        {p.name}
+                      </div>
+                    )}
+                  </td>
                   <td className="p-3 text-gray-500">{p.comment || "-"}</td>
                   <td className="p-3 font-semibold">{p.stock}</td>
                 </tr>
@@ -285,7 +322,11 @@ export default function StockApp() {
             </tbody>
           </table>
 
-          <div className="flex justify-center py-4 border-t bg-slate-50">
+          <div className="flex flex-col items-center gap-2 py-4 border-t bg-slate-50">
+
+            <div className="text-xs text-slate-500">
+              Total productos: {products.length}
+            </div>
 
             <div className="flex items-center gap-2 bg-white border rounded-full px-4 py-2 shadow-sm">
 

@@ -31,4 +31,17 @@ export default async function handler(req, res) {
     return res.status(200).json({ ok:true });
   }
 
+  if (req.method === 'PUT') {
+
+  const { id, name } = req.body;
+
+  await sql`
+    UPDATE products
+    SET name = ${name}
+    WHERE id = ${id}
+  `;
+
+  return res.status(200).json({ ok:true });
+}
+
 }
