@@ -33,11 +33,11 @@ export default async function handler(req, res) {
 
   if (req.method === 'PUT') {
 
-  const { id, name } = req.body;
+  const { id, name, stock } = req.body;
 
   await sql`
     UPDATE products
-    SET name = ${name}
+    SET name = ${name}, stock = ${stock}
     WHERE id = ${id}
   `;
 

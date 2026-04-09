@@ -39,7 +39,6 @@ export default function StockApp() {
   const [filterDate, setFilterDate] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
 
-  const [editStockId, setEditStockId] = useState(null);
   const [editStockValue, setEditStockValue] = useState("");
 
   const [confirmModal, setConfirmModal] = useState(null);
@@ -128,29 +127,17 @@ const paginatedMovements = filteredMovements.slice(
     loadProducts();
   };
 
-  const updateProductName = async (id) => {
-  await fetch(`${API_URL}/products`,{
-    method:"PUT",
-    headers:{"Content-Type":"application/json"},
-    body:JSON.stringify({id,name:editName})
-  });
+  const saveEdit = async (id) => {
+    await fetch(`${API_URL}/products`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id, name: editName, stock: Number(editStockValue) })
+    });
 
-  setEditingId(null);
-  notify("Nombre actualizado","success");
-  loadProducts();
-};
-
-const updateStock = async(id)=>{
-  await fetch(`${API_URL}/products`,{
-    method:"PUT",
-    headers:{"Content-Type":"application/json"},
-    body:JSON.stringify({id,stock:Number(editStockValue)})
-  });
-
-  setEditStockId(null);
-  notify("Stock actualizado","success");
-  loadProducts();
-};
+    setEditingId(null);
+    notify("Producto actualizado", "success");
+    loadProducts();
+  };
 
 const deleteProduct = async(id)=>{
   await fetch(`${API_URL}/products`,{
@@ -340,42 +327,48 @@ const deleteProduct = async(id)=>{
               ))}
 
               {!loading && paginatedProducts.map((p)=>(
-<tr key={p.id} className="border-t">
-<td className="p-3 flex items-center gap-2">
-{editingId===p.id ? (
-<>
-<input className="border rounded px-2 py-1" value={editName} onChange={e=>setEditName(e.target.value)}/>
-<button onClick={()=>updateProductName(p.id)}>✔</button>
-</>
-):(
-<>
-<span>{p.name}</span>
-<button onClick={()=>{setEditingId(p.id);setEditName(p.name)}}>✏</button>
-</>
-)}
-</td>
+                <tr key={p.id} className="border-t hover:bg-slate-50 transition-colors">
+                  <td className="p-3">
+                    {editingId === p.id ? (
+                      <input className="border border-blue-400 rounded px-2 py-1 w-full sm:w-auto text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" value={editName} onChange={e=>setEditName(e.target.value)}/>
+                    ) : (
+                      <span className="font-medium text-gray-800">{p.name}</span>
+                    )}
+                  </td>
 
-<td className="p-3 text-gray-500">{p.comment||"-"}</td>
+                  <td className="p-3 text-gray-500">{p.comment||"-"}</td>
 
-<td className="p-3">
-{editStockId===p.id?(
-<>
-<input type="number" className="border w-20" value={editStockValue} onChange={e=>setEditStockValue(e.target.value)}/>
-<button onClick={()=>updateStock(p.id)}>✔</button>
-</>
-):(
-<div className="flex items-center gap-2">
-<span>{p.stock}</span>
-<button onClick={()=>{setEditStockId(p.id);setEditStockValue(p.stock)}}>✏</button>
-</div>
-)}
-</td>
+                  <td className="p-3">
+                    {editingId === p.id ? (
+                      <input type="number" className="border border-blue-400 rounded px-2 py-1 w-20 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" value={editStockValue} onChange={e=>setEditStockValue(e.target.value)}/>
+                    ) : (
+                      <span className="font-semibold">{p.stock}</span>
+                    )}
+                  </td>
 
-<td className="p-3">
-<button onClick={()=>setConfirmModal(p.id)} className="text-red-500">🗑</button>
-</td>
-</tr>
-))}
+                  <td className="p-3 flex items-center gap-3">
+                    {editingId === p.id ? (
+                      <>
+                        <button onClick={() => saveEdit(p.id)} className="text-green-600 hover:text-green-800 flex items-center gap-1 transition-colors" title="Guardar">
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" /></svg>
+                        </button>
+                        <button onClick={() => setEditingId(null)} className="text-gray-500 hover:text-gray-700 flex items-center gap-1 transition-colors" title="Cancelar">
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" /></svg>
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <button onClick={() => { setEditingId(p.id); setEditName(p.name); setEditStockValue(p.stock); }} className="text-blue-500 hover:text-blue-700 transition-colors" title="Editar">
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" /></svg>
+                        </button>
+                        <button onClick={()=>setConfirmModal(p.id)} className="text-red-500 hover:text-red-700 transition-colors" title="Eliminar">
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" /></svg>
+                        </button>
+                      </>
+                    )}
+                  </td>
+                </tr>
+              ))}
 
             </tbody>
           </table>
