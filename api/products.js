@@ -2,11 +2,15 @@ import { sql } from '@vercel/postgres';
 
 export default async function handler(req, res) {
 
-  // obtener productos
+  // obtener productos por area
   if (req.method === 'GET') {
 
+    const { area } = req.query;
+
     const { rows } = await sql`
-      SELECT * FROM products
+      SELECT *
+      FROM products
+      WHERE area = ${area}
       ORDER BY id DESC
     `;
 
@@ -14,7 +18,7 @@ export default async function handler(req, res) {
   }
 
 
-  // crear producto
+  // crear producto en el area correcta
   if (req.method === 'POST') {
 
     const { name, area, stock, comment } = req.body;
