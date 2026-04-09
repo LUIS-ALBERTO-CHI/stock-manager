@@ -285,22 +285,57 @@ export default function StockApp() {
             </tbody>
           </table>
 
-          <div className="flex justify-end gap-2 p-3">
-            <button
-              disabled={pageProducts === 1}
-              onClick={() => setPageProducts(p => p - 1)}
-              className="px-3 py-1 border rounded"
-            >←</button>
+          <div className="flex justify-center py-4 border-t bg-slate-50">
 
-            <span className="text-sm">
-              {pageProducts} / {totalProductPages || 1}
-            </span>
+            <div className="flex items-center gap-2 bg-white border rounded-full px-4 py-2 shadow-sm">
 
-            <button
-              disabled={pageProducts === totalProductPages}
-              onClick={() => setPageProducts(p => p + 1)}
-              className="px-3 py-1 border rounded"
-            >→</button>
+              <button
+                onClick={() => setPageProducts(p => Math.max(p - 1, 1))}
+                className="px-2 text-slate-500 hover:text-black"
+              >
+                ‹
+              </button>
+
+              {[...Array(totalProductPages || 1)].map((_, i) => {
+                const page = i + 1;
+                const active = page === pageProducts;
+
+                if (
+                  totalProductPages > 7 &&
+                  page > 3 &&
+                  page < totalProductPages - 2 &&
+                  Math.abs(pageProducts - page) > 1
+                ) {
+                  if (page === 4) return <span key={page}>...</span>;
+                  return null;
+                }
+
+                return (
+                  <button
+                    key={page}
+                    onClick={() => setPageProducts(page)}
+                    className={`w-8 h-8 text-sm rounded-full ${
+                      active
+                        ? "bg-indigo-100 text-indigo-700 font-semibold"
+                        : "text-slate-600 hover:bg-slate-100"
+                    }`}
+                  >
+                    {page}
+                  </button>
+                );
+              })}
+
+              <button
+                onClick={() =>
+                  setPageProducts(p => Math.min(p + 1, totalProductPages))
+                }
+                className="px-2 text-slate-500 hover:text-black"
+              >
+                ›
+              </button>
+
+            </div>
+
           </div>
 
         </div>
@@ -323,7 +358,7 @@ export default function StockApp() {
 
             <tbody>
 
-              {paginatedMovements.map(m => (
+              {paginatedMovements.map((m) => (
                 <tr key={m.id} className="border-t">
                   <td className="p-3">
                     {new Date(m.date).toLocaleDateString("es-MX")}
@@ -337,22 +372,57 @@ export default function StockApp() {
             </tbody>
           </table>
 
-          <div className="flex justify-end gap-2 p-3">
-            <button
-              disabled={pageMovements === 1}
-              onClick={() => setPageMovements(p => p - 1)}
-              className="px-3 py-1 border rounded"
-            >←</button>
+          <div className="flex justify-center py-4 border-t bg-slate-50">
 
-            <span className="text-sm">
-              {pageMovements} / {totalMovementPages || 1}
-            </span>
+            <div className="flex items-center gap-2 bg-white border rounded-full px-4 py-2 shadow-sm">
 
-            <button
-              disabled={pageMovements === totalMovementPages}
-              onClick={() => setPageMovements(p => p + 1)}
-              className="px-3 py-1 border rounded"
-            >→</button>
+              <button
+                onClick={() => setPageMovements(p => Math.max(p - 1, 1))}
+                className="px-2 text-slate-500 hover:text-black"
+              >
+                ‹
+              </button>
+
+              {[...Array(totalMovementPages || 1)].map((_, i) => {
+                const page = i + 1;
+                const active = page === pageMovements;
+
+                if (
+                  totalMovementPages > 7 &&
+                  page > 3 &&
+                  page < totalMovementPages - 2 &&
+                  Math.abs(pageMovements - page) > 1
+                ) {
+                  if (page === 4) return <span key={page}>...</span>;
+                  return null;
+                }
+
+                return (
+                  <button
+                    key={page}
+                    onClick={() => setPageMovements(page)}
+                    className={`w-8 h-8 text-sm rounded-full ${
+                      active
+                        ? "bg-indigo-100 text-indigo-700 font-semibold"
+                        : "text-slate-600 hover:bg-slate-100"
+                    }`}
+                  >
+                    {page}
+                  </button>
+                );
+              })}
+
+              <button
+                onClick={() =>
+                  setPageMovements(p => Math.min(p + 1, totalMovementPages))
+                }
+                className="px-2 text-slate-500 hover:text-black"
+              >
+                ›
+              </button>
+
+            </div>
+
           </div>
 
         </div>
