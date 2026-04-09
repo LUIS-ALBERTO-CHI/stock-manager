@@ -96,6 +96,40 @@ const paginatedMovements = filteredMovements.slice(
     setMovements(data);
   };
 
+   const exportExcel = async () => {
+  const XLSX = await import("xlsx");
+
+  const workbook = XLSX.utils.book_new();
+
+  for (const area of AREA_ORDER) {
+    const resProducts = await fetch(`${API_URL}/products?area=${area}`);
+    const products = await resProducts.json();
+
+    const resMovements = await fetch(`${API_URL}/movements?area=${area}`);
+    const movements = await resMovements.json();
+
+    const productRows = products.map(p => ({
+      MATERIAL: p.name,
+      STOCK: p.stock
+    }));
+
+    const movementRows = movements.map(m => ({
+      FECHA: new Date(m.date).toLocaleDateString("es-MX"),
+      CODIGO: m.product,
+      TIPO: m.type,
+      CANTIDAD: m.qty
+    }));
+
+    const ws1 = XLSX.utils.json_to_sheet(productRows);
+    const ws2 = XLSX.utils.json_to_sheet(movementRows);
+
+    XLSX.utils.book_append_sheet(workbook, ws1, `${area} STOCK`);
+    XLSX.utils.book_append_sheet(workbook, ws2, `${area} MOVS`);
+  }
+
+  XLSX.writeFile(workbook, "fogysa-stock.xlsx");
+};
+
   useEffect(() => {
     loadProducts();
     loadMovements();
@@ -197,6 +231,15 @@ const deleteProduct = async(id)=>{
           <div className="opacity-80 text-sm">Control de inventario</div>
         </div>
       </header>
+
+      <div className="max-w-7xl mx-auto px-6 pt-4">
+<button
+onClick={exportExcel}
+className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg shadow flex items-center gap-2"
+>
+📥 Exportar Excel
+</button>
+</div>
 
       <main className="p-6 max-w-7xl mx-auto space-y-6">
 
