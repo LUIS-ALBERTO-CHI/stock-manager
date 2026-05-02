@@ -41,7 +41,6 @@ export default function StockApp() {
   const [loading, setLoading] = useState(true);
 
   const [editingId, setEditingId] = useState(null);
-  const [editName, setEditName] = useState("");
 
   const [pageProducts, setPageProducts] = useState(1);
   const [pageMovements, setPageMovements] = useState(1);
@@ -49,8 +48,6 @@ export default function StockApp() {
   const [filterProduct, setFilterProduct] = useState("");
   const [filterDate, setFilterDate] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
-
-  const [editStockValue, setEditStockValue] = useState("");
 
   const [confirmModal, setConfirmModal] = useState(null);
 
@@ -276,14 +273,18 @@ const borderStyle = {
     loadProducts();
   };
 
-  const saveEdit = async (id) => {
+  const saveEdit = async () => {
     await fetch(`${API_URL}/products`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id, name: editName, stock: Number(editStockValue) })
+      body: JSON.stringify({ id: editingId, name: newProduct, stock: Number(initialStock || 0) })
     });
 
     setEditingId(null);
+    setNewProduct("");
+    setInitialStock("");
+    setComment("");
+    setIsModalOpen(false);
     notify("Producto actualizado", "success");
     loadProducts();
   };
@@ -347,6 +348,10 @@ const deleteProduct = async(id)=>{
     setTimeout(() => { if (circle.parentNode === button) circle.remove(); }, 600);
 
     // Lógica del modal
+    setEditingId(null);
+    setNewProduct("");
+    setInitialStock("");
+    setComment("");
     setModalType(activeTab === "history" ? "movement" : "product");
     setIsModalOpen(false); // reset state to allow animation
     setTimeout(() => setIsModalOpen(true), 10);
@@ -410,6 +415,20 @@ const deleteProduct = async(id)=>{
           from { opacity: 0; transform: translateY(10px); }
           to { opacity: 1; transform: translateY(0); }
         }
+        
+        /* Spinner Animation */
+        .loader {
+          border: 3px solid #e4e9ed;
+          border-radius: 50%;
+          border-top: 3px solid #0b4f71;
+          width: 40px;
+          height: 40px;
+          animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+          0% { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
+        }
 
         .icon-fill { font-variation-settings: 'FILL' 1; }
         .scrollbar-hide::-webkit-scrollbar { display: none; }
@@ -467,6 +486,14 @@ const deleteProduct = async(id)=>{
 
       {/* Main Content Canvas */}
       <main className="pt-20 px-4 md:px-6 max-w-7xl mx-auto w-full">
+      
+        {/* Loader Overlay */}
+        {loading && (
+          <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-[#f6fafe]/80 backdrop-blur-sm">
+            <div className="loader mb-4"></div>
+            <p className="text-[#41484e] font-semibold text-[14px]">Cargando inventario...</p>
+          </div>
+        )}
 
         {/* Top Controls: Search & Chips */}
         <div className="flex flex-col gap-4 mb-6">
@@ -517,36 +544,25 @@ const deleteProduct = async(id)=>{
                     </div>
                   </div>
                   
-                  {editingId === p.id ? (
-                    <div className="pl-2 border-t border-[#c1c7ce] pt-3 flex flex-col gap-2">
-                      <input value={editName} onChange={e=>setEditName(e.target.value)} className="border border-[#c1c7ce] rounded p-2 text-[14px]" placeholder="Nombre..." />
-                      <input type="number" value={editStockValue} onChange={e=>setEditStockValue(e.target.value)} className="border border-[#c1c7ce] rounded p-2 text-[14px] w-full" placeholder="Stock" />
-                      <div className="flex gap-2 justify-end mt-1">
-                        <button onClick={() => setEditingId(null)} className="text-[#41484e] bg-[#eaeef2] px-3 py-1.5 rounded-lg text-[13px] font-bold">Cancelar</button>
-                        <button onClick={() => saveEdit(p.id)} className="text-[#ffffff] bg-[#1f6c3a] px-3 py-1.5 rounded-lg text-[13px] font-bold">Guardar</button>
-                      </div>
+                  <div className="flex justify-between items-center mt-2 pl-2 border-t border-[#c1c7ce] pt-3">
+                    {p.stock < 5 ? (
+                      <span className="inline-flex items-center gap-1 text-[12px] font-semibold text-[#93000a] bg-[#ffdad6] px-2 py-1 rounded-md">
+                        <span className="material-symbols-outlined text-[14px]">warning</span> Crítico
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 text-[12px] font-semibold text-[#005226] bg-[#a6f4b5] px-2 py-1 rounded-md">
+                        <span className="material-symbols-outlined text-[14px]">check_circle</span> En Stock
+                      </span>
+                    )}
+                    <div className="flex gap-2">
+                      <button onClick={() => { setEditingId(p.id); setNewProduct(p.name); setInitialStock(p.stock); setComment(p.comment || ""); setModalType("product"); setIsModalOpen(true); }} className="p-1.5 text-[#71787e] hover:text-[#0b4f71] bg-[#eaeef2] rounded-lg transition-colors">
+                        <span className="material-symbols-outlined text-[20px]">edit</span>
+                      </button>
+                      <button onClick={() => setConfirmModal(p.id)} className="p-1.5 text-[#71787e] hover:text-[#ba1a1a] bg-[#eaeef2] rounded-lg transition-colors">
+                        <span className="material-symbols-outlined text-[20px]">delete</span>
+                      </button>
                     </div>
-                  ) : (
-                    <div className="flex justify-between items-center mt-2 pl-2 border-t border-[#c1c7ce] pt-3">
-                      {p.stock < 5 ? (
-                        <span className="inline-flex items-center gap-1 text-[12px] font-semibold text-[#93000a] bg-[#ffdad6] px-2 py-1 rounded-md">
-                          <span className="material-symbols-outlined text-[14px]">warning</span> Crítico
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1 text-[12px] font-semibold text-[#005226] bg-[#a6f4b5] px-2 py-1 rounded-md">
-                          <span className="material-symbols-outlined text-[14px]">check_circle</span> En Stock
-                        </span>
-                      )}
-                      <div className="flex gap-2">
-                        <button onClick={() => { setEditingId(p.id); setEditName(p.name); setEditStockValue(p.stock); }} className="p-1.5 text-[#71787e] hover:text-[#0b4f71] bg-[#eaeef2] rounded-lg transition-colors">
-                          <span className="material-symbols-outlined text-[20px]">edit</span>
-                        </button>
-                        <button onClick={() => setConfirmModal(p.id)} className="p-1.5 text-[#71787e] hover:text-[#ba1a1a] bg-[#eaeef2] rounded-lg transition-colors">
-                          <span className="material-symbols-outlined text-[20px]">delete</span>
-                        </button>
-                      </div>
-                    </div>
-                  )}
+                </div>
                 </div>
               ))}
             </div>
@@ -579,24 +595,17 @@ const deleteProduct = async(id)=>{
                         <span className={`w-3 h-3 rounded-full inline-block shadow-sm ${p.stock < 5 ? 'bg-[#ba1a1a] animate-pulse' : 'bg-[#1f6c3a]'}`}></span>
                       </td>
                       <td className="py-3 px-4 font-semibold text-[#171c1f]">
-                        {editingId === p.id ? <input className="border border-[#c1c7ce] px-2 py-1 rounded w-full text-[14px]" value={editName} onChange={e=>setEditName(e.target.value)}/> : p.name}
+                        {p.name}
                       </td>
                       <td className="py-3 px-4 text-[13px] text-[#41484e]">{p.comment || "-"}</td>
                       <td className={`py-3 px-4 text-right font-bold ${p.stock < 5 ? 'text-[#ba1a1a]' : 'text-[#1f6c3a]'}`}>
-                        {editingId === p.id ? <input type="number" className="border border-[#c1c7ce] px-2 py-1 rounded w-20 text-[14px]" value={editStockValue} onChange={e=>setEditStockValue(e.target.value)}/> : p.stock}
+                        {p.stock}
                       </td>
                       <td className="py-3 px-4 text-right">
-                        {editingId === p.id ? (
-                          <div className="flex justify-end gap-1">
-                            <button onClick={() => saveEdit(p.id)} className="text-[#1f6c3a] hover:text-[#005226] p-1"><span className="material-symbols-outlined">save</span></button>
-                            <button onClick={() => setEditingId(null)} className="text-[#71787e] hover:text-[#171c1f] p-1"><span className="material-symbols-outlined">close</span></button>
-                          </div>
-                        ) : (
-                          <div className="flex justify-end gap-1">
-                            <button onClick={() => { setEditingId(p.id); setEditName(p.name); setEditStockValue(p.stock); }} className="text-[#71787e] hover:text-[#0b4f71] p-1 transition-colors"><span className="material-symbols-outlined">edit</span></button>
-                            <button onClick={() => setConfirmModal(p.id)} className="text-[#71787e] hover:text-[#ba1a1a] p-1 transition-colors"><span className="material-symbols-outlined">delete</span></button>
-                          </div>
-                        )}
+                        <div className="flex justify-end gap-1">
+                          <button onClick={() => { setEditingId(p.id); setNewProduct(p.name); setInitialStock(p.stock); setComment(p.comment || ""); setModalType("product"); setIsModalOpen(true); }} className="text-[#71787e] hover:text-[#0b4f71] p-1 transition-colors"><span className="material-symbols-outlined">edit</span></button>
+                          <button onClick={() => setConfirmModal(p.id)} className="text-[#71787e] hover:text-[#ba1a1a] p-1 transition-colors"><span className="material-symbols-outlined">delete</span></button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -717,8 +726,8 @@ const deleteProduct = async(id)=>{
           <div className="bg-[#f6fafe] rounded-xl w-full max-w-lg shadow-xl overflow-hidden flex flex-col animate-fade-in-up max-h-[90vh]">
             <div className="px-6 py-4 border-b border-[#c1c7ce]/50 flex justify-between items-center bg-[#ffffff] shadow-sm z-10">
               <h2 className="text-[18px] font-bold text-[#0b4f71] flex items-center gap-2 tracking-tight">
-                <span className="material-symbols-outlined">{modalType === "product" ? "add_box" : "swap_horiz"}</span>
-                {modalType === "product" ? "Nuevo Producto" : "Nuevo Movimiento"}
+                <span className="material-symbols-outlined">{modalType === "product" ? (editingId ? "edit" : "add_box") : "swap_horiz"}</span>
+                {modalType === "product" ? (editingId ? "Editar Producto" : "Nuevo Producto") : "Nuevo Movimiento"}
               </h2>
               <button onClick={() => setIsModalOpen(false)} className="text-[#0b4f71] hover:text-[#ba1a1a] p-1.5 rounded-full hover:bg-[#eaeef2] transition-colors flex items-center justify-center">
                 <span className="material-symbols-outlined">close</span>
@@ -745,8 +754,8 @@ const deleteProduct = async(id)=>{
                     <textarea value={comment} onChange={e => setComment(e.target.value)} className="block w-full py-2 px-3 border border-[#c1c7ce] focus:outline-none focus:ring-2 focus:ring-[#0b4f71] focus:border-transparent rounded-md bg-[#ffffff] text-[#171c1f] text-[14px] resize-none" placeholder="Detalles opcionales..." rows={3} />
                   </div>
                   <div className="pt-2">
-                    <button onClick={addProduct} className="w-full flex justify-center items-center py-3 px-4 rounded-lg shadow-sm text-[14px] font-semibold text-[#ffffff] bg-[#0b4f71] hover:bg-[#003752] transition-colors duration-200">
-                      <span className="material-symbols-outlined mr-2 text-[20px]">save</span> Guardar Producto
+                    <button onClick={editingId ? saveEdit : addProduct} className="w-full flex justify-center items-center py-3 px-4 rounded-lg shadow-sm text-[14px] font-semibold text-[#ffffff] bg-[#0b4f71] hover:bg-[#003752] transition-colors duration-200">
+                      <span className="material-symbols-outlined mr-2 text-[20px]">{editingId ? "save_as" : "save"}</span> {editingId ? "Actualizar Producto" : "Guardar Producto"}
                     </button>
                   </div>
                 </>
