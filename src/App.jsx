@@ -11,6 +11,9 @@ const AREA_ORDER = [
   "MATERIAL"
 ];
 
+// Mismo tope que el API (api/movements.js).
+const CANTIDAD_MAXIMA = 1000000;
+
 const AREA_COLORS = {
   "PECUARIO": "bg-green-800",
   "MASCOTAS": "bg-blue-900",
@@ -27,7 +30,8 @@ export default function StockApp() {
 
   const [areas, setAreas] = useState({});
   const [activeArea, setActiveArea] = useState("PECUARIO");
-  const [movements, setMovements] = useState([]);
+  const [movementsByArea, setMovementsByArea] = useState({});
+  const [saving, setSaving] = useState(false);
 
   const [productName, setProductName] = useState("");
   const [qty, setQty] = useState("");
@@ -60,6 +64,7 @@ export default function StockApp() {
   const ITEMS_PER_PAGE = 6;
 
   const products = areas[activeArea] || [];
+  const movements = movementsByArea[activeArea] || [];
 
   const searchedProducts = products.filter(p =>
     p.name.toLowerCase().includes(searchQuery.toLowerCase())
@@ -89,6 +94,18 @@ const paginatedMovements = filteredMovements.slice(
     setTimeout(() => setNotification(null), 2600);
   };
 
+  const selectArea = (area) => {
+    if (area === activeArea) return;
+    setActiveArea(area);
+    // Todo lo que depende de los productos del área anterior se limpia aquí.
+    // Si no, el modal de movimiento conservaba el producto viejo y lo guardaba
+    // con el área nueva (ej. "CILINDROS AZULES" de NUPEC registrado en KUBOTA).
+    setProductName("");
+    setFilterProduct("");
+    setPageProducts(1);
+    setPageMovements(1);
+  };
+
   const loadProducts = async () => {
     setLoading(true);
 
@@ -104,10 +121,14 @@ const paginatedMovements = filteredMovements.slice(
   };
 
   const loadMovements = async () => {
-    const res = await fetch(`${API_URL}/movements?area=${activeArea}`);
+    const area = activeArea;
+    const res = await fetch(`${API_URL}/movements?area=${area}`);
     const data = await res.json();
 
-    setMovements(data);
+    // Se guarda por área, igual que los productos: si el usuario cambia de
+    // categoría antes de que responda el servidor, la respuesta tardía no
+    // aparece bajo la categoría equivocada.
+    setMovementsByArea(prev => ({ ...prev, [area]: data }));
   };
 
   const exportExcel = async () => {
@@ -247,21 +268,36 @@ const borderStyle = {
   }, [activeArea]);
 
   const addProduct = async () => {
+    if (saving) return;
     if (!newProduct.trim()) {
       notify("Ingresa nombre del producto", "error");
       return;
     }
 
-    await fetch(`${API_URL}/products`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        name: newProduct,
-        stock: Number(initialStock || 0),
-        comment,
-        area: activeArea
-      })
-    });
+    setSaving(true);
+    try {
+      const res = await fetch(`${API_URL}/products`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: newProduct,
+          stock: Number(initialStock || 0),
+          comment,
+          area: activeArea
+        })
+      });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        notify(data.error || "No se pudo guardar el producto", "error");
+        return;
+      }
+    } catch {
+      notify("Sin conexión: no se guardó el producto", "error");
+      return;
+    } finally {
+      setSaving(false);
+    }
 
     notify("Producto guardado", "success");
 
@@ -274,11 +310,30 @@ const borderStyle = {
   };
 
   const saveEdit = async () => {
-    await fetch(`${API_URL}/products`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id: editingId, name: newProduct, stock: Number(initialStock || 0) })
-    });
+    if (saving) return;
+    if (!newProduct.trim()) {
+      notify("Ingresa nombre del producto", "error");
+      return;
+    }
+    setSaving(true);
+    try {
+      const res = await fetch(`${API_URL}/products`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: editingId, name: newProduct, stock: Number(initialStock || 0) })
+      });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        notify(data.error || "No se pudo actualizar el producto", "error");
+        return;
+      }
+    } catch {
+      notify("Sin conexión: no se actualizó el producto", "error");
+      return;
+    } finally {
+      setSaving(false);
+    }
 
     setEditingId(null);
     setNewProduct("");
@@ -301,25 +356,61 @@ const deleteProduct = async(id)=>{
 };
 
   const addMovement = async () => {
+    if (saving) return;
     if (!productName || !qty) {
       notify("Selecciona producto y cantidad", "error");
       return;
     }
 
-    await fetch(`${API_URL}/movements`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        product: productName,
-        qty: Number(qty),
-        type,
-        area: activeArea
-      })
-    });
+    // El producto debe existir en el área activa: el nombre vive en el estado
+    // y no debe poder colarse desde otra área.
+    if (!products.some(p => p.name === productName)) {
+      notify(`"${productName}" no pertenece a ${activeArea}. Selecciona el producto de nuevo.`, "error");
+      setProductName("");
+      return;
+    }
+
+    const amount = Number(qty);
+    if (!Number.isInteger(amount) || amount <= 0 || amount > CANTIDAD_MAXIMA) {
+      notify(`La cantidad debe ser un número entero entre 1 y ${CANTIDAD_MAXIMA.toLocaleString("es-MX")}`, "error");
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const res = await fetch(`${API_URL}/movements`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          product: productName,
+          qty: amount,
+          type,
+          area: activeArea
+        })
+      });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        notify(data.error || "No se pudo guardar el movimiento", "error");
+        // Si el producto ya no existe en el área (p. ej. lo borraron desde otro
+        // dispositivo), se limpia la selección y se recarga el catálogo del área.
+        if (data.code === "PRODUCTO_NO_EXISTE") {
+          setProductName("");
+          loadProducts();
+        }
+        return;
+      }
+    } catch {
+      notify("Sin conexión: no se guardó el movimiento", "error");
+      return;
+    } finally {
+      setSaving(false);
+    }
 
     notify("Movimiento guardado", "info");
 
     setQty("");
+    setProductName("");
     setIsModalOpen(false);
 
     loadProducts();
@@ -352,6 +443,8 @@ const deleteProduct = async(id)=>{
     setNewProduct("");
     setInitialStock("");
     setComment("");
+    setProductName("");
+    setQty("");
     setModalType(activeTab === "history" ? "movement" : "product");
     setIsModalOpen(false); // reset state to allow animation
     setTimeout(() => setIsModalOpen(true), 10);
@@ -511,7 +604,7 @@ const deleteProduct = async(id)=>{
             {AREA_ORDER.map((area) => (
               <button
                 key={area}
-                onClick={() => setActiveArea(area)}
+                onClick={() => selectArea(area)}
                 className={`whitespace-nowrap px-4 py-2 rounded-full text-[12px] font-bold uppercase tracking-wider transition-colors shadow-sm ${
                   activeArea === area 
                     ? `${AREA_COLORS[area]} text-white border border-transparent` 
@@ -633,7 +726,7 @@ const deleteProduct = async(id)=>{
                 onChange={e => {setFilterProduct(e.target.value); setPageMovements(1);}}
               >
                 <option value="">Filtrar por producto...</option>
-                {products.map(p=><option key={p.id}>{p.name}</option>)}
+                {products.map(p=><option key={p.id} value={p.name}>{p.name}</option>)}
               </select>
 
               <input 
@@ -754,8 +847,8 @@ const deleteProduct = async(id)=>{
                     <textarea value={comment} onChange={e => setComment(e.target.value)} className="block w-full py-2 px-3 border border-[#c1c7ce] focus:outline-none focus:ring-2 focus:ring-[#0b4f71] focus:border-transparent rounded-md bg-[#ffffff] text-[#171c1f] text-[14px] resize-none" placeholder="Detalles opcionales..." rows={3} />
                   </div>
                   <div className="pt-2">
-                    <button onClick={editingId ? saveEdit : addProduct} className="w-full flex justify-center items-center py-3 px-4 rounded-lg shadow-sm text-[14px] font-semibold text-[#ffffff] bg-[#0b4f71] hover:bg-[#003752] transition-colors duration-200">
-                      <span className="material-symbols-outlined mr-2 text-[20px]">{editingId ? "save_as" : "save"}</span> {editingId ? "Actualizar Producto" : "Guardar Producto"}
+                    <button onClick={editingId ? saveEdit : addProduct} disabled={saving} className="w-full flex justify-center items-center py-3 px-4 rounded-lg shadow-sm text-[14px] font-semibold text-[#ffffff] bg-[#0b4f71] hover:bg-[#003752] transition-colors duration-200 disabled:opacity-60 disabled:cursor-wait">
+                      <span className="material-symbols-outlined mr-2 text-[20px]">{editingId ? "save_as" : "save"}</span> {saving ? "Guardando..." : (editingId ? "Actualizar Producto" : "Guardar Producto")}
                     </button>
                   </div>
                 </>
@@ -767,7 +860,7 @@ const deleteProduct = async(id)=>{
                       <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                         <span className="material-symbols-outlined text-[#71787e] text-[20px]">search</span>
                       </div>
-                      <select value={productName} onChange={e => setProductName(e.target.value)} className="block w-full pl-10 pr-10 py-2.5 border border-[#c1c7ce] focus:outline-none focus:ring-2 focus:ring-[#0b4f71] focus:border-transparent rounded-md bg-[#ffffff] text-[#171c1f] text-[14px] appearance-none">
+                      <select value={products.some(p => p.name === productName) ? productName : ""} onChange={e => setProductName(e.target.value)} className="block w-full pl-10 pr-10 py-2.5 border border-[#c1c7ce] focus:outline-none focus:ring-2 focus:ring-[#0b4f71] focus:border-transparent rounded-md bg-[#ffffff] text-[#171c1f] text-[14px] appearance-none">
                         <option value="" disabled>Seleccionar producto...</option>
                         {products.map(p => <option key={p.id} value={p.name}>{p.name}</option>)}
                       </select>
@@ -800,8 +893,8 @@ const deleteProduct = async(id)=>{
                   </div>
 
                   <div className="pt-2">
-                    <button onClick={addMovement} className="w-full flex justify-center items-center py-3 px-4 rounded-lg shadow-sm text-[14px] font-semibold text-[#ffffff] bg-[#0b4f71] hover:bg-[#003752] transition-colors duration-200">
-                      <span className="material-symbols-outlined mr-2 text-[20px]">save</span> Registrar Movimiento
+                    <button onClick={addMovement} disabled={saving} className="w-full flex justify-center items-center py-3 px-4 rounded-lg shadow-sm text-[14px] font-semibold text-[#ffffff] bg-[#0b4f71] hover:bg-[#003752] transition-colors duration-200 disabled:opacity-60 disabled:cursor-wait">
+                      <span className="material-symbols-outlined mr-2 text-[20px]">save</span> {saving ? "Guardando..." : "Registrar Movimiento"}
                     </button>
                   </div>
                 </>
