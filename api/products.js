@@ -62,7 +62,7 @@ export default async function handler(req, res) {
 
   if (req.method === 'PUT') {
 
-    const { id, name, stock } = req.body ?? {};
+    const { id, name, stock, comment } = req.body ?? {};
 
     if (!Number.isInteger(id)) {
       return res.status(400).json({ ok: false, error: 'Falta el id del producto' });
@@ -79,17 +79,37 @@ export default async function handler(req, res) {
       return res.status(400).json({ ok: false, error: 'El stock debe ser un número entero' });
     }
 
+    let rows;
     try {
-      await sql`
+      // Una sola sentencia: actualiza el producto y, si cambió el nombre, renombra
+      // también sus movimientos para que el historial y el filtro lo sigan encontrando.
+      ({ rows } = await sql`
+        WITH anterior AS (
+          SELECT name, area FROM products WHERE id = ${id}
+        ),
+        historial AS (
+          UPDATE movements m
+          SET product = ${name}
+          FROM anterior
+          WHERE m.product = anterior.name
+          AND m.area = anterior.area
+          AND anterior.name <> ${name}
+          RETURNING m.id
+        )
         UPDATE products
-        SET name = ${name}, stock = ${cantidad}
+        SET name = ${name}, stock = ${cantidad}, comment = ${comment ?? ''}
         WHERE id = ${id}
-      `;
+        RETURNING id
+      `);
     } catch (err) {
       if (err?.code === UNIQUE_VIOLATION) {
         return res.status(409).json({ ok: false, error: `Ya existe otro producto llamado "${name}" en esta área` });
       }
       throw err;
+    }
+
+    if (rows.length === 0) {
+      return res.status(404).json({ ok: false, error: 'El producto ya no existe' });
     }
 
     return res.status(200).json({ ok: true });

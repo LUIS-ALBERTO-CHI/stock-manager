@@ -320,7 +320,7 @@ const borderStyle = {
       const res = await fetch(`${API_URL}/products`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: editingId, name: newProduct, stock: Number(initialStock || 0) })
+        body: JSON.stringify({ id: editingId, name: newProduct, stock: Number(initialStock || 0), comment })
       });
 
       if (!res.ok) {
